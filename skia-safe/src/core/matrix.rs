@@ -545,8 +545,12 @@ impl Matrix {
         stf: ScaleToFit,
     ) -> bool {
         unsafe {
-            self.native_mut()
-                .setRectToRect(src.as_ref().native(), dst.as_ref().native(), stf)
+            sb::C_SkMatrix_Rect2Rect(
+                src.as_ref().native(),
+                dst.as_ref().native(),
+                stf,
+                self.native_mut(),
+            )
         }
     }
 
@@ -564,10 +568,11 @@ impl Matrix {
             return false;
         }
         unsafe {
-            self.native_mut().setPolyToPoly(
+            sb::C_SkMatrix_PolyToPoly(
                 src.native().as_ptr(),
                 dst.native().as_ptr(),
                 src.len().try_into().unwrap(),
+                self.native_mut(),
             )
         }
     }
@@ -615,18 +620,17 @@ impl Matrix {
 
         unsafe {
             self.native().mapPoints(
-                dst.native_mut().as_mut_ptr(),
-                src.native().as_ptr(),
-                src.len().try_into().unwrap(),
+                sk_span_mut(dst[..src.len()].native_mut()),
+                sk_span(src.native()),
             )
         };
     }
 
     pub fn map_points_inplace(&self, pts: &mut [Point]) {
-        let ptr = pts.native_mut().as_mut_ptr();
+        let src = pts.to_vec();
         unsafe {
             self.native()
-                .mapPoints(ptr, ptr, pts.len().try_into().unwrap())
+                .mapPoints(sk_span_mut(pts.native_mut()), sk_span(src.native()))
         };
     }
 
@@ -635,9 +639,8 @@ impl Matrix {
 
         unsafe {
             self.native().mapHomogeneousPoints(
-                dst.native_mut().as_mut_ptr(),
-                src.native().as_ptr(),
-                src.len().try_into().unwrap(),
+                sk_span_mut(dst[..src.len()].native_mut()),
+                sk_span(src.native()),
             )
         };
     }
@@ -646,10 +649,9 @@ impl Matrix {
         assert!(dst.len() >= src.len());
 
         unsafe {
-            self.native().mapHomogeneousPoints1(
-                dst.native_mut().as_mut_ptr(),
-                src.native().as_ptr(),
-                src.len().try_into().unwrap(),
+            self.native().mapPointsToHomogeneous(
+                sk_span_mut(dst[..src.len()].native_mut()),
+                sk_span(src.native()),
             )
         };
     }
@@ -657,7 +659,7 @@ impl Matrix {
     pub fn map_point(&self, point: impl Into<Point>) -> Point {
         let point = point.into();
         let mut p = Point::default();
-        unsafe { self.native().mapXY(point.x, point.y, p.native_mut()) };
+        unsafe { sb::C_SkMatrix_mapXY(self.native(), point.x, point.y, p.native_mut()) };
         p
     }
 
@@ -683,18 +685,17 @@ impl Matrix {
         assert!(dst.len() >= src.len());
         unsafe {
             self.native().mapVectors(
-                dst.native_mut().as_mut_ptr(),
-                src.native().as_ptr(),
-                src.len().try_into().unwrap(),
+                sk_span_mut(dst[..src.len()].native_mut()),
+                sk_span(src.native()),
             )
         }
     }
 
     pub fn map_vectors_inplace(&self, vecs: &mut [Vector]) {
-        let ptr = vecs.native_mut().as_mut_ptr();
+        let src = vecs.to_vec();
         unsafe {
             self.native()
-                .mapVectors(ptr, ptr, vecs.len().try_into().unwrap())
+                .mapVectors(sk_span_mut(vecs.native_mut()), sk_span(src.native()))
         }
     }
 
@@ -713,9 +714,10 @@ impl Matrix {
         rect: impl AsRef<Rect>,
         perspective_clip: ApplyPerspectiveClip,
     ) -> (Rect, bool) {
+        let _ = perspective_clip;
         let mut rect = *rect.as_ref();
-        let ptr = rect.native_mut();
-        let rect_stays_rect = unsafe { self.native().mapRect(ptr, ptr, perspective_clip) };
+        let src = rect;
+        let rect_stays_rect = unsafe { self.native().mapRect(rect.native_mut(), src.native()) };
         (rect, rect_stays_rect)
     }
 

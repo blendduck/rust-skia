@@ -91,7 +91,7 @@ impl Iter<'_> {
     /// Returns: [`Iter`] of path
     ///
     /// example: <https://fiddle.skia.org/c/@Path_Iter_const_SkPath>
-    pub fn new(path: &Path, force_close: bool) -> Iter {
+    pub fn new(path: &Path, force_close: bool) -> Iter<'_> {
         Iter(
             unsafe { SkPath_Iter::new1(path.native(), force_close) },
             PhantomData,
@@ -106,11 +106,11 @@ impl Iter<'_> {
     /// * `force_close` - `true` if open contours generate [`Verb::Close`]
     ///
     /// example: <https://fiddle.skia.org/c/@Path_Iter_setPath>
-    pub fn set_path(mut self, path: &Path, force_close: bool) -> Iter {
+    pub fn set_path(mut self, path: &Path, force_close: bool) -> Iter<'_> {
         unsafe {
             self.0.setPath(path.native(), force_close);
         }
-        let r = Iter(self.0, PhantomData);
+        let r = Iter(unsafe { ptr::read(&self.0) }, PhantomData);
         forget(self);
         r
     }
@@ -215,11 +215,11 @@ impl Default for RawIter<'_> {
 
 #[allow(deprecated)]
 impl RawIter<'_> {
-    pub fn new(path: &Path) -> RawIter {
+    pub fn new(path: &Path) -> RawIter<'_> {
         RawIter::default().set_path(path)
     }
 
-    pub fn set_path(mut self, path: &Path) -> RawIter {
+    pub fn set_path(mut self, path: &Path) -> RawIter<'_> {
         unsafe { self.native_mut().setPath(path.native()) }
         let r = RawIter(self.0, PhantomData);
         forget(self);
@@ -852,14 +852,9 @@ impl Path {
     ///
     /// example: <https://fiddle.skia.org/c/@Path_getPoints>
     pub fn get_points(&self, points: &mut [Point]) -> usize {
-        unsafe {
-            self.native().getPoints(
-                points.native_mut().as_mut_ptr(),
-                points.len().try_into().unwrap(),
-            )
-        }
-        .try_into()
-        .unwrap()
+        unsafe { self.native().getPoints(sk_span_mut(points.native_mut())) }
+            .try_into()
+            .unwrap()
     }
 
     /// Returns the number of verbs: [`Verb::Move`], [`Verb::Line`], [`Verb::Quad`], [`Verb::Conic`],
@@ -882,12 +877,9 @@ impl Path {
     ///
     /// example: <https://fiddle.skia.org/c/@Path_getVerbs>
     pub fn get_verbs(&self, verbs: &mut [u8]) -> usize {
-        unsafe {
-            self.native()
-                .getVerbs(verbs.as_mut_ptr(), verbs.len().try_into().unwrap())
-        }
-        .try_into()
-        .unwrap()
+        unsafe { self.native().getVerbs(sk_span_mut(verbs)) }
+            .try_into()
+            .unwrap()
     }
 
     /// Returns the approximate byte size of the [`Path`] in memory.
@@ -1397,8 +1389,13 @@ impl Path {
     ) -> &mut Self {
         let (r, end) = (r.into(), end.into());
         unsafe {
-            self.native_mut()
-                .arcTo2(r.x, r.y, x_axis_rotate, large_arc, sweep, end.x, end.y);
+            self.native_mut().arcTo2(
+                r.into_native(),
+                x_axis_rotate,
+                large_arc,
+                sweep,
+                end.into_native(),
+            );
         }
         self
     }
@@ -1439,8 +1436,13 @@ impl Path {
     ) -> &mut Self {
         let (r, d) = (r.into(), d.into());
         unsafe {
-            self.native_mut()
-                .rArcTo(r.x, r.y, x_axis_rotate, large_arc, sweep, d.x, d.y);
+            self.native_mut().rArcTo(
+                r.into_native(),
+                x_axis_rotate,
+                large_arc,
+                sweep,
+                d.into_native(),
+            );
         }
         self
     }
@@ -1915,8 +1917,9 @@ impl Path {
     ///
     /// example: <https://fiddle.skia.org/c/@Path_getLastPt>
     pub fn last_pt(&self) -> Option<Point> {
-        let mut last_pt = Point::default();
-        unsafe { self.native().getLastPt(last_pt.native_mut()) }.if_true_some(last_pt)
+        self.count_points()
+            .checked_sub(1)
+            .and_then(|index| self.get_point(index))
     }
 
     /// Sets the last point on the path. If [`Point`] array is empty, append [`Verb::Move`] to
@@ -1951,7 +1954,7 @@ impl Path {
     /// example: <https://fiddle.skia.org/c/@Path_contains>
     pub fn contains(&self, p: impl Into<Point>) -> bool {
         let p = p.into();
-        unsafe { self.native().contains(p.x, p.y) }
+        unsafe { self.native().contains(*p.native()) }
     }
 
     /// Writes text representation of [`Path`] to [`Data`].

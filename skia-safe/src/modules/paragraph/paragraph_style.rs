@@ -58,7 +58,7 @@ impl StrutStyle {
         StrutStyle::construct(|ss| unsafe { sb::C_StrutStyle_Construct(ss) })
     }
 
-    pub fn font_families(&self) -> FontFamilies {
+    pub fn font_families(&self) -> FontFamilies<'_> {
         unsafe {
             let mut count = 0;
             let ptr = sb::C_StrutStyle_getFontFamilies(self.native(), &mut count);

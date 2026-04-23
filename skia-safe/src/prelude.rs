@@ -11,6 +11,7 @@ use std::{
 
 use skia_bindings::{
     sk_sp, C_SkRefCntBase_ref, C_SkRefCntBase_unique, C_SkRefCntBase_unref, SkRefCnt, SkRefCntBase,
+    SkSpan,
 };
 
 /// Convert any reference into any other.
@@ -26,6 +27,22 @@ pub(crate) unsafe fn transmute_ref_mut<FromT, ToT>(from: &mut FromT) -> &mut ToT
     debug_assert_eq!(mem::size_of::<FromT>(), mem::size_of::<ToT>());
     debug_assert_eq!(mem::align_of::<FromT>(), mem::align_of::<ToT>());
     &mut *(from as *mut FromT as *mut ToT)
+}
+
+pub(crate) fn sk_span<T>(slice: &[T]) -> SkSpan<T> {
+    SkSpan {
+        _phantom_0: PhantomData,
+        fPtr: slice.as_ptr() as *mut T,
+        fSize: slice.len(),
+    }
+}
+
+pub(crate) fn sk_span_mut<T>(slice: &mut [T]) -> SkSpan<T> {
+    SkSpan {
+        _phantom_0: PhantomData,
+        fPtr: slice.as_mut_ptr(),
+        fSize: slice.len(),
+    }
 }
 
 pub(crate) trait IntoOption {
@@ -951,11 +968,11 @@ impl<H> Borrows<'_, H> {
 }
 
 pub(crate) trait BorrowsFrom: Sized {
-    fn borrows<D: ?Sized>(self, _dep: &D) -> Borrows<Self>;
+    fn borrows<D: ?Sized>(self, _dep: &D) -> Borrows<'_, Self>;
 }
 
 impl<T: Sized> BorrowsFrom for T {
-    fn borrows<D: ?Sized>(self, _dep: &D) -> Borrows<Self> {
+    fn borrows<D: ?Sized>(self, _dep: &D) -> Borrows<'_, Self> {
         Borrows(self, PhantomData)
     }
 }

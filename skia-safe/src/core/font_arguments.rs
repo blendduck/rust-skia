@@ -117,7 +117,7 @@ impl FontArguments<'_, '_> {
         self.native().fCollectionIndex.try_into().unwrap()
     }
 
-    pub fn variation_design_position(&self) -> VariationPosition {
+    pub fn variation_design_position(&self) -> VariationPosition<'_> {
         unsafe {
             let position = sb::C_SkFontArguments_getVariationDesignPosition(self.native());
             VariationPosition {
@@ -143,7 +143,7 @@ impl FontArguments<'_, '_> {
         }
     }
 
-    pub fn palette(&self) -> Palette {
+    pub fn palette(&self) -> Palette<'_> {
         unsafe {
             let palette = sb::C_SkFontArguments_getPalette(self.native());
             Palette {

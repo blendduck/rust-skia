@@ -472,7 +472,7 @@ impl TextStyle {
         self
     }
 
-    pub fn font_families(&self) -> FontFamilies {
+    pub fn font_families(&self) -> FontFamilies<'_> {
         unsafe {
             let mut count = 0;
             let ptr = sb::C_TextStyle_getFontFamilies(self.native(), &mut count);

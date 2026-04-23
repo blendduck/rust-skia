@@ -144,7 +144,7 @@ impl Paragraph {
         range[0]..range[1]
     }
 
-    pub fn get_line_metrics(&self) -> Vec<LineMetrics> {
+    pub fn get_line_metrics(&self) -> Vec<LineMetrics<'_>> {
         let mut result: Vec<LineMetrics> = Vec::new();
         let mut set_lm = |lms: &[sb::skia_textlayout_LineMetrics]| {
             result = lms.iter().map(LineMetrics::from_native_ref).collect();
@@ -334,7 +334,7 @@ impl Paragraph {
     /// * `line_metrics` - an address to return the info (in case of null just skipped)
     ///
     /// Returns: `true` if the line is found; `false` if not
-    pub fn get_line_metrics_at(&self, line_number: usize) -> Option<LineMetrics> {
+    pub fn get_line_metrics_at(&self, line_number: usize) -> Option<LineMetrics<'_>> {
         let mut r = None;
         let mut set_lm = |lm: &sb::skia_textlayout_LineMetrics| {
             r = Some(LineMetrics::from_native_ref(lm));

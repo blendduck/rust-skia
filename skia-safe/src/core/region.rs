@@ -81,7 +81,8 @@ impl Region {
     }
 
     pub fn get_boundary_path(&self, path: &mut Path) -> bool {
-        unsafe { self.native().getBoundaryPath(path.native_mut()) }
+        *path = Path::from_native_c(unsafe { self.native().getBoundaryPath() });
+        !path.is_empty()
     }
 
     pub fn set_empty(&mut self) -> bool {
@@ -355,7 +356,7 @@ impl<'a> Iterator<'a> {
         unsafe { self.native_mut().rewind() }
     }
 
-    pub fn reset(mut self, region: &Region) -> Iterator {
+    pub fn reset(mut self, region: &Region) -> Iterator<'_> {
         unsafe {
             self.native_mut().reset(region.native());
             mem::transmute(self)

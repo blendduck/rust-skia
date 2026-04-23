@@ -10,22 +10,23 @@ variant_name!(PathOp::XOR);
 
 pub fn op(one: &Path, two: &Path, op: PathOp) -> Option<Path> {
     let mut result = Path::default();
-    unsafe { sb::Op(one.native(), two.native(), op, result.native_mut()) }.if_true_some(result)
+    unsafe { sb::C_SkPathOp_Op(one.native(), two.native(), op, result.native_mut()) }
+        .if_true_some(result)
 }
 
 pub fn simplify(path: &Path) -> Option<Path> {
     let mut result = Path::default();
-    unsafe { sb::Simplify(path.native(), result.native_mut()) }.if_true_some(result)
+    unsafe { sb::C_SkPathOp_Simplify(path.native(), result.native_mut()) }.if_true_some(result)
 }
 
 pub fn tight_bounds(path: &Path) -> Option<Rect> {
     let mut result = Rect::default();
-    unsafe { sb::TightBounds(path.native(), result.native_mut()) }.if_true_some(result)
+    unsafe { sb::C_SkPathOp_TightBounds(path.native(), result.native_mut()) }.if_true_some(result)
 }
 
 pub fn as_winding(path: &Path) -> Option<Path> {
     let mut result = Path::default();
-    unsafe { sb::AsWinding(path.native(), result.native_mut()) }.if_true_some(result)
+    unsafe { sb::C_SkPathOp_AsWinding(path.native(), result.native_mut()) }.if_true_some(result)
 }
 
 pub type OpBuilder = Handle<SkOpBuilder>;
@@ -59,7 +60,8 @@ impl OpBuilder {
 
     pub fn resolve(&mut self) -> Option<Path> {
         let mut path = Path::default();
-        unsafe { self.native_mut().resolve(path.native_mut()) }.if_true_some(path)
+        unsafe { sb::C_SkOpBuilder_resolve2(self.native_mut(), path.native_mut()) }
+            .if_true_some(path)
     }
 }
 

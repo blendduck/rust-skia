@@ -1,7 +1,7 @@
-use crate::{prelude::*, Matrix, NativeFlattenable, Path, Rect, StrokeRec};
+use crate::{prelude::*, Matrix, NativeFlattenable, Path, PathBuilder, Rect, StrokeRec};
 use sb::SkPathEffect_INHERITED;
 use skia_bindings::{self as sb, SkFlattenable, SkPathEffect, SkRefCntBase};
-use std::fmt;
+use std::{fmt, ptr};
 
 pub type PathEffect = RCHandle<SkPathEffect>;
 unsafe_send_sync!(PathEffect);
@@ -66,14 +66,20 @@ impl PathEffect {
         stroke_rec: &mut StrokeRec,
         cull_rect: impl AsRef<Rect>,
     ) -> bool {
-        unsafe {
+        let mut builder = PathBuilder::new();
+        let filtered = unsafe {
             self.native().filterPath(
-                dst.native_mut(),
+                builder.native_mut(),
                 src.native(),
                 stroke_rec.native_mut(),
                 cull_rect.as_ref().native(),
+                ptr::null(),
             )
+        };
+        if filtered {
+            *dst = builder.detach();
         }
+        filtered
     }
 
     pub fn filter_path_inplace_with_matrix(
@@ -84,15 +90,20 @@ impl PathEffect {
         cull_rect: impl AsRef<Rect>,
         ctm: &Matrix,
     ) -> bool {
-        unsafe {
-            self.native().filterPath1(
-                dst.native_mut(),
+        let mut builder = PathBuilder::new();
+        let filtered = unsafe {
+            self.native().filterPath(
+                builder.native_mut(),
                 src.native(),
                 stroke_rec.native_mut(),
                 cull_rect.as_ref().native(),
                 ctm.native(),
             )
+        };
+        if filtered {
+            *dst = builder.detach();
         }
+        filtered
     }
 
     pub fn needs_ctm(&self) -> bool {

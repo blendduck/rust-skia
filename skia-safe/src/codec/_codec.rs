@@ -237,6 +237,7 @@ impl Codec<'_> {
                 None => sb::SkCodec_kNoFrame,
                 Some(frame) => frame.try_into().expect("invalid prior frame"),
             },
+            fMaxDecodeMemory: 0,
         }
     }
 

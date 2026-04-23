@@ -76,6 +76,9 @@
 #include "include/core/SkTypeface.h"
 #include "include/core/SkTypes.h"
 #include "include/core/SkVertices.h"
+// gpu/
+#include "include/gpu/ganesh/GrDirectContext.h"
+#include "include/gpu/ganesh/GrRecordingContext.h"
 // docs/
 #include "include/docs/SkPDFDocument.h"
 // effects/
@@ -87,7 +90,7 @@
 #include "include/effects/SkCornerPathEffect.h"
 #include "include/effects/SkDashPathEffect.h"
 #include "include/effects/SkDiscretePathEffect.h"
-#include "include/effects/SkGradientShader.h"
+#include "include/effects/SkGradient.h"
 #include "include/effects/SkHighContrastFilter.h"
 #include "include/effects/SkImageFilters.h"
 #include "include/effects/SkLumaColorFilter.h"
@@ -118,6 +121,207 @@
 #include "include/utils/SkParsePath.h"
 #include "include/utils/SkShadowUtils.h"
 #include "include/utils/SkTextUtils.h"
+#include "src/core/SkPathPriv.h"
+
+namespace {
+
+SkSpan<const SkScalar> gradient_positions(const SkScalar pos[], int count) {
+    return pos ? SkSpan(pos, static_cast<size_t>(count)) : SkSpan<const SkScalar>();
+}
+
+std::vector<SkColor4f> gradient_colors_4f(const SkColor colors[], int count) {
+    std::vector<SkColor4f> converted;
+    converted.reserve(count);
+    for (int i = 0; i < count; ++i) {
+        converted.push_back(SkColor4f::FromColor(colors[i]));
+    }
+    return converted;
+}
+
+template <typename Fn>
+SkPath* mutate_path(SkPath* self, Fn&& fn) {
+    SkPathBuilder builder(*self);
+    fn(builder);
+    *self = builder.detach();
+    return self;
+}
+
+}  // namespace
+
+class SkGradientShader {
+public:
+    using Interpolation = SkGradient::Interpolation;
+
+    enum Flags : uint32_t {
+        kInterpolateColorsInPremul_Flag = 1u << 0,
+    };
+
+    static sk_sp<SkShader> MakeLinear(const SkPoint pts[2],
+                                      const SkColor colors[],
+                                      const SkScalar pos[],
+                                      int count,
+                                      SkTileMode mode,
+                                      uint32_t flags,
+                                      const SkMatrix* localMatrix) {
+        auto converted = gradient_colors_4f(colors, count);
+        return SkShaders::LinearGradient(
+                pts,
+                SkGradient(SkGradient::Colors(SkSpan(converted.data(), converted.size()),
+                                             gradient_positions(pos, count),
+                                             mode),
+                           Interpolation::FromFlags(flags)),
+                localMatrix);
+    }
+
+    static sk_sp<SkShader> MakeLinear(const SkPoint pts[2],
+                                      const SkColor4f colors[],
+                                      sk_sp<SkColorSpace> colorSpace,
+                                      const SkScalar pos[],
+                                      int count,
+                                      SkTileMode mode,
+                                      const Interpolation& interpolation,
+                                      const SkMatrix* localMatrix) {
+        return SkShaders::LinearGradient(
+                pts,
+                SkGradient(SkGradient::Colors(SkSpan(colors, static_cast<size_t>(count)),
+                                             gradient_positions(pos, count),
+                                             mode,
+                                             std::move(colorSpace)),
+                           interpolation),
+                localMatrix);
+    }
+
+    static sk_sp<SkShader> MakeRadial(SkPoint center,
+                                      SkScalar radius,
+                                      const SkColor colors[],
+                                      const SkScalar pos[],
+                                      int count,
+                                      SkTileMode mode,
+                                      uint32_t flags,
+                                      const SkMatrix* localMatrix) {
+        auto converted = gradient_colors_4f(colors, count);
+        return SkShaders::RadialGradient(
+                center,
+                radius,
+                SkGradient(SkGradient::Colors(SkSpan(converted.data(), converted.size()),
+                                             gradient_positions(pos, count),
+                                             mode),
+                           Interpolation::FromFlags(flags)),
+                localMatrix);
+    }
+
+    static sk_sp<SkShader> MakeRadial(SkPoint center,
+                                      SkScalar radius,
+                                      const SkColor4f colors[],
+                                      sk_sp<SkColorSpace> colorSpace,
+                                      const SkScalar pos[],
+                                      int count,
+                                      SkTileMode mode,
+                                      const Interpolation& interpolation,
+                                      const SkMatrix* localMatrix) {
+        return SkShaders::RadialGradient(
+                center,
+                radius,
+                SkGradient(SkGradient::Colors(SkSpan(colors, static_cast<size_t>(count)),
+                                             gradient_positions(pos, count),
+                                             mode,
+                                             std::move(colorSpace)),
+                           interpolation),
+                localMatrix);
+    }
+
+    static sk_sp<SkShader> MakeTwoPointConical(SkPoint start,
+                                               SkScalar startRadius,
+                                               SkPoint end,
+                                               SkScalar endRadius,
+                                               const SkColor colors[],
+                                               const SkScalar pos[],
+                                               int count,
+                                               SkTileMode mode,
+                                               uint32_t flags,
+                                               const SkMatrix* localMatrix) {
+        auto converted = gradient_colors_4f(colors, count);
+        return SkShaders::TwoPointConicalGradient(
+                start,
+                startRadius,
+                end,
+                endRadius,
+                SkGradient(SkGradient::Colors(SkSpan(converted.data(), converted.size()),
+                                             gradient_positions(pos, count),
+                                             mode),
+                           Interpolation::FromFlags(flags)),
+                localMatrix);
+    }
+
+    static sk_sp<SkShader> MakeTwoPointConical(SkPoint start,
+                                               SkScalar startRadius,
+                                               SkPoint end,
+                                               SkScalar endRadius,
+                                               const SkColor4f colors[],
+                                               sk_sp<SkColorSpace> colorSpace,
+                                               const SkScalar pos[],
+                                               int count,
+                                               SkTileMode mode,
+                                               const Interpolation& interpolation,
+                                               const SkMatrix* localMatrix) {
+        return SkShaders::TwoPointConicalGradient(
+                start,
+                startRadius,
+                end,
+                endRadius,
+                SkGradient(SkGradient::Colors(SkSpan(colors, static_cast<size_t>(count)),
+                                             gradient_positions(pos, count),
+                                             mode,
+                                             std::move(colorSpace)),
+                           interpolation),
+                localMatrix);
+    }
+
+    static sk_sp<SkShader> MakeSweep(SkScalar cx,
+                                     SkScalar cy,
+                                     const SkColor colors[],
+                                     const SkScalar pos[],
+                                     int count,
+                                     SkTileMode mode,
+                                     SkScalar startAngle,
+                                     SkScalar endAngle,
+                                     uint32_t flags,
+                                     const SkMatrix* localMatrix) {
+        auto converted = gradient_colors_4f(colors, count);
+        return SkShaders::SweepGradient(
+                {cx, cy},
+                startAngle,
+                endAngle,
+                SkGradient(SkGradient::Colors(SkSpan(converted.data(), converted.size()),
+                                             gradient_positions(pos, count),
+                                             mode),
+                           Interpolation::FromFlags(flags)),
+                localMatrix);
+    }
+
+    static sk_sp<SkShader> MakeSweep(SkScalar cx,
+                                     SkScalar cy,
+                                     const SkColor4f colors[],
+                                     sk_sp<SkColorSpace> colorSpace,
+                                     const SkScalar pos[],
+                                     int count,
+                                     SkTileMode mode,
+                                     SkScalar startAngle,
+                                     SkScalar endAngle,
+                                     const Interpolation& interpolation,
+                                     const SkMatrix* localMatrix) {
+        return SkShaders::SweepGradient(
+                {cx, cy},
+                startAngle,
+                endAngle,
+                SkGradient(SkGradient::Colors(SkSpan(colors, static_cast<size_t>(count)),
+                                             gradient_positions(pos, count),
+                                             mode,
+                                             std::move(colorSpace)),
+                           interpolation),
+                localMatrix);
+    }
+};
 
 extern "C" void C_Bindings_Types(Sink<bool>) {}
 
@@ -452,7 +656,7 @@ extern "C" size_t C_SkImage_textureSize(const SkImage* self) {
 }
 
 extern "C" bool C_SkImage_isValid(const SkImage* self, GrRecordingContext* context) {
-    return self->isValid(context);
+    return self->isValid(context ? context->asRecorder() : nullptr);
 }
 
 extern "C" SkImage* C_SkImage_makeScaled(const SkImage* self, const SkImageInfo* info, const SkSamplingOptions* sampling) {
@@ -460,11 +664,11 @@ extern "C" SkImage* C_SkImage_makeScaled(const SkImage* self, const SkImageInfo*
 }
 
 extern "C" SkData* C_SkImage_refEncodedData(const SkImage* self) {
-    return self->refEncodedData().release();
+    return const_cast<SkData*>(self->refEncodedData().release());
 }
 
 extern "C" SkImage* C_SkImage_makeSubset(const SkImage* self, GrDirectContext* context, const SkIRect* subset) {
-    return self->makeSubset(context, *subset).release();
+    return self->makeSubset(context ? context->asRecorder() : nullptr, *subset, {}).release();
 }
 
 extern "C" SkImage* C_SkImage_withDefaultMipmaps(const SkImage* self) {
@@ -484,7 +688,7 @@ extern "C" bool C_SkImage_isLazyGenerated(const SkImage* self) {
 }
 
 extern "C" SkImage* C_SkImage_makeColorSpace(const SkImage* self, GrDirectContext* direct, SkColorSpace* target) {
-    return self->makeColorSpace(direct, sp(target)).release();
+    return self->makeColorSpace(direct ? direct->asRecorder() : nullptr, sp(target), {}).release();
 }
 
 extern "C" SkImage* C_SkImage_reinterpretColorSpace(const SkImage* self, SkColorSpace* newColorSpace) {
@@ -622,7 +826,12 @@ extern "C" void C_SkPath_Make(SkPath* uninitialized,
     const uint8_t vbs[], int verbCount,
     const SkScalar ws[], int wCount,
     SkPathFillType ft, bool isVolatile) {
-    new(uninitialized) SkPath(SkPath::Make(pts, pointCount, vbs, verbCount, ws, wCount, ft, isVolatile));
+    new(uninitialized) SkPath(SkPath::Make(
+        SkSpan(pts, static_cast<size_t>(pointCount)),
+        SkSpan(vbs, static_cast<size_t>(verbCount)),
+        SkSpan(ws, static_cast<size_t>(wCount)),
+        ft,
+        isVolatile));
 }
 
 extern "C" void C_SkPath_Rect(SkPath* uninitialized,
@@ -659,7 +868,11 @@ extern "C" void C_SkPath_Polygon(SkPath* uninitialized,
     const SkPoint pts[], int count, bool isClosed,
     SkPathFillType ft,
     bool isVolatile) {
-    new(uninitialized) SkPath(SkPath::Polygon(pts, count, isClosed, ft, isVolatile));
+    new(uninitialized) SkPath(SkPath::Polygon(
+        SkSpan(pts, static_cast<size_t>(count)),
+        isClosed,
+        ft,
+        isVolatile));
 }
 
 extern "C" void C_SkPath_destruct(const SkPath* self) {
@@ -710,12 +923,265 @@ extern "C" void C_SkPath_computeTightBounds(const SkPath* self, SkRect* uninitia
     new (uninitialized) SkRect(self->computeTightBounds());
 }
 
+extern "C" bool C_SkPath_isArc(const SkPath* self, SkArc* arc) {
+    (void)self;
+    (void)arc;
+    return false;
+}
+
+extern "C" SkPath* C_SkPath_moveTo(SkPath* self, SkScalar x, SkScalar y) {
+    return mutate_path(self, [&](SkPathBuilder& builder) { builder.moveTo(x, y); });
+}
+
+extern "C" SkPath* C_SkPath_rMoveTo(SkPath* self, SkScalar dx, SkScalar dy) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.rMoveTo(dx, dy);
+    });
+}
+
+extern "C" SkPath* C_SkPath_lineTo(SkPath* self, SkScalar x, SkScalar y) {
+    return mutate_path(self, [&](SkPathBuilder& builder) { builder.lineTo(x, y); });
+}
+
+extern "C" SkPath* C_SkPath_rLineTo(SkPath* self, SkScalar dx, SkScalar dy) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.rLineTo(dx, dy);
+    });
+}
+
+extern "C" SkPath* C_SkPath_quadTo(
+        SkPath* self, SkScalar x1, SkScalar y1, SkScalar x2, SkScalar y2) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.quadTo(x1, y1, x2, y2);
+    });
+}
+
+extern "C" SkPath* C_SkPath_rQuadTo(
+        SkPath* self, SkScalar dx1, SkScalar dy1, SkScalar dx2, SkScalar dy2) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.rQuadTo(dx1, dy1, dx2, dy2);
+    });
+}
+
+extern "C" SkPath* C_SkPath_conicTo(
+        SkPath* self, SkScalar x1, SkScalar y1, SkScalar x2, SkScalar y2, SkScalar w) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.conicTo(x1, y1, x2, y2, w);
+    });
+}
+
+extern "C" SkPath* C_SkPath_rConicTo(
+        SkPath* self, SkScalar dx1, SkScalar dy1, SkScalar dx2, SkScalar dy2, SkScalar w) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.rConicTo(dx1, dy1, dx2, dy2, w);
+    });
+}
+
+extern "C" SkPath* C_SkPath_cubicTo(
+        SkPath* self,
+        SkScalar x1,
+        SkScalar y1,
+        SkScalar x2,
+        SkScalar y2,
+        SkScalar x3,
+        SkScalar y3) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.cubicTo(x1, y1, x2, y2, x3, y3);
+    });
+}
+
+extern "C" SkPath* C_SkPath_rCubicTo(
+        SkPath* self,
+        SkScalar dx1,
+        SkScalar dy1,
+        SkScalar dx2,
+        SkScalar dy2,
+        SkScalar dx3,
+        SkScalar dy3) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.rCubicTo(dx1, dy1, dx2, dy2, dx3, dy3);
+    });
+}
+
+extern "C" SkPath* C_SkPath_arcTo(
+        SkPath* self,
+        const SkRect* oval,
+        SkScalar startAngleDeg,
+        SkScalar sweepAngleDeg,
+        bool forceMoveTo) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.arcTo(*oval, startAngleDeg, sweepAngleDeg, forceMoveTo);
+    });
+}
+
+extern "C" SkPath* C_SkPath_arcTo1(
+        SkPath* self, SkScalar x1, SkScalar y1, SkScalar x2, SkScalar y2, SkScalar radius) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.arcTo(SkPoint::Make(x1, y1), SkPoint::Make(x2, y2), radius);
+    });
+}
+
+extern "C" SkPath* C_SkPath_arcTo2(
+        SkPath* self,
+        SkPoint r,
+        SkScalar xAxisRotate,
+        SkPathBuilder::ArcSize largeArc,
+        SkPathDirection sweep,
+        SkPoint xy) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.arcTo(r, xAxisRotate, largeArc, sweep, xy);
+    });
+}
+
+extern "C" SkPath* C_SkPath_rArcTo(
+        SkPath* self,
+        SkPoint r,
+        SkScalar xAxisRotate,
+        SkPathBuilder::ArcSize largeArc,
+        SkPathDirection sweep,
+        SkPoint xy) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.rArcTo(r, xAxisRotate, largeArc, sweep, xy);
+    });
+}
+
+extern "C" SkPath* C_SkPath_close(SkPath* self) {
+    return mutate_path(self, [&](SkPathBuilder& builder) { builder.close(); });
+}
+
+extern "C" SkPath* C_SkPath_addCircle(
+        SkPath* self, SkScalar x, SkScalar y, SkScalar radius, SkPathDirection dir) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.addCircle(x, y, radius, dir);
+    });
+}
+
+extern "C" SkPath* C_SkPath_addRect(
+        SkPath* self,
+        const SkRect* rect,
+        SkPathDirection dir,
+        unsigned startIndex) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.addRect(*rect, dir, startIndex);
+    });
+}
+
+extern "C" SkPath* C_SkPath_addOval1(
+        SkPath* self,
+        const SkRect* rect,
+        SkPathDirection dir,
+        unsigned startIndex) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.addOval(*rect, dir, startIndex);
+    });
+}
+
+extern "C" SkPath* C_SkPath_addArc(
+        SkPath* self, const SkRect* oval, SkScalar startAngleDeg, SkScalar sweepAngleDeg) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.addArc(*oval, startAngleDeg, sweepAngleDeg);
+    });
+}
+
+extern "C" SkPath* C_SkPath_addRoundRect(
+        SkPath* self,
+        const SkRect* rect,
+        SkScalar rx,
+        SkScalar ry,
+        SkPathDirection dir) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        SkRRect rrect;
+        rrect.setRectXY(*rect, rx, ry);
+        builder.addRRect(rrect, dir);
+    });
+}
+
+extern "C" SkPath* C_SkPath_addRRect1(
+        SkPath* self,
+        const SkRRect* rrect,
+        SkPathDirection dir,
+        unsigned startIndex) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.addRRect(*rrect, dir, startIndex);
+    });
+}
+
+extern "C" SkPath* C_SkPath_addPoly(
+        SkPath* self, const SkPoint pts[], int count, bool close) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.addPolygon(SkSpan(pts, static_cast<size_t>(count)), close);
+    });
+}
+
+extern "C" SkPath* C_SkPath_addPathOffset(
+        SkPath* self, const SkPath* src, SkScalar dx, SkScalar dy, SkPath::AddPathMode mode) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.addPath(*src, dx, dy, mode);
+    });
+}
+
+extern "C" SkPath* C_SkPath_addPath1(
+        SkPath* self, const SkPath* src, const SkMatrix* matrix, SkPath::AddPathMode mode) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        builder.addPath(*src, *matrix, mode);
+    });
+}
+
+extern "C" SkPath* C_SkPath_reverseAddPath(SkPath* self, const SkPath* src) {
+    return mutate_path(self, [&](SkPathBuilder& builder) {
+        SkPathPriv::ReverseAddPath(&builder, *src);
+    });
+}
+
+extern "C" void C_SkPath_offset(
+        const SkPath* self, SkScalar dx, SkScalar dy, SkPath* dst) {
+    *dst = self->makeOffset(dx, dy);
+}
+
+extern "C" void C_SkPath_transform(
+        const SkPath* self, const SkMatrix* matrix, SkPath* dst) {
+    *dst = self->makeTransform(*matrix);
+}
+
+extern "C" SkPath* C_SkPath_setLastPt(SkPath* self, SkScalar x, SkScalar y) {
+    return mutate_path(self, [&](SkPathBuilder& builder) { builder.setLastPt(x, y); });
+}
+
+extern "C" bool C_SkPath_getLastPt2(const SkPath* self, SkPoint* point) {
+    if (auto last = self->getLastPt()) {
+        *point = *last;
+        return true;
+    }
+    return false;
+}
+
+extern "C" size_t C_SkPath_readFromMemory(SkPath* self, const void* buffer, size_t length) {
+    size_t bytes_read = 0;
+    if (auto path = SkPath::ReadFromMemory(buffer, length, &bytes_read)) {
+        *self = *path;
+        return bytes_read;
+    }
+    return 0;
+}
+
+extern "C" void C_SkPath_dumpArrays(const SkPath* self, void* stream, bool dump_as_hex) {
+    self->dump(reinterpret_cast<SkWStream*>(stream), dump_as_hex);
+}
+
 //
 // core/SkPathBuilder.h
 //
 
 extern "C" void C_SkPathBuilder_Construct(SkPathBuilder* uninitialized) {
     new(uninitialized) SkPathBuilder();
+}
+
+extern "C" bool C_SkPathBuilder_getLastPt2(const SkPathBuilder* self, SkPoint* point) {
+    if (auto last = self->getLastPt()) {
+        *point = *last;
+        return true;
+    }
+    return false;
 }
 
 /* m87: Implementation is missing.
@@ -768,7 +1234,21 @@ C_SkPathTypes_Types(SkPathFillType *, SkPathDirection *, SkPathSegmentMask *, Sk
 //
 
 extern "C" bool C_PathUtils_FillPathWithPaint(const SkPath* src, const SkPaint* paint, SkPath* dst, const SkRect* cullRect, const SkMatrix* matrix) {
-    return skpathutils::FillPathWithPaint(*src, *paint, dst, cullRect, *matrix);
+    SkPathBuilder builder;
+    bool is_fill = false;
+    if (cullRect || matrix) {
+        const SkMatrix identity = SkMatrix::I();
+        is_fill = skpathutils::FillPathWithPaint(
+            *src,
+            *paint,
+            &builder,
+            cullRect,
+            matrix ? *matrix : identity);
+    } else {
+        is_fill = skpathutils::FillPathWithPaint(*src, *paint, &builder);
+    }
+    *dst = builder.detach();
+    return is_fill;
 }
 
 //
@@ -1075,6 +1555,31 @@ extern "C" void C_SkMatrix_setScaleTranslate(SkMatrix* self, SkScalar sx, SkScal
     self->setScaleTranslate(sx, sy, tx, ty);
 }
 
+extern "C" bool C_SkMatrix_Rect2Rect(
+        const SkRect* src, const SkRect* dst, SkMatrix::ScaleToFit stf, SkMatrix* result) {
+    if (auto matrix = SkMatrix::Rect2Rect(*src, *dst, stf)) {
+        *result = *matrix;
+        return true;
+    }
+    return false;
+}
+
+extern "C" bool C_SkMatrix_PolyToPoly(
+        const SkPoint* src, const SkPoint* dst, int count, SkMatrix* result) {
+    if (auto matrix = SkMatrix::PolyToPoly(
+                SkSpan(src, static_cast<size_t>(count)),
+                SkSpan(dst, static_cast<size_t>(count)))) {
+        *result = *matrix;
+        return true;
+    }
+    return false;
+}
+
+extern "C" void C_SkMatrix_mapXY(
+        const SkMatrix* self, SkScalar x, SkScalar y, SkPoint* point) {
+    *point = self->mapPoint({x, y});
+}
+
 extern "C" bool C_SkMatrix_isFinite(const SkMatrix* self) {
     return self->isFinite();
 }
@@ -1328,21 +1833,40 @@ extern "C" SkTextBlob* C_SkTextBlob_MakeFromText(const void* text, size_t byteLe
 extern "C" SkTextBlob *C_SkTextBlob_MakeFromPosTextH(const void *text, size_t byteLength,
                                                      const SkScalar xPos[], SkScalar constY, const SkFont *font,
                                                      SkTextEncoding encoding) {
-    return SkTextBlob::MakeFromPosTextH(text, byteLength, xPos, constY, *font, encoding).release();
+    const auto count = font->countText(text, byteLength, encoding);
+    return SkTextBlob::MakeFromPosTextH(
+        text,
+        byteLength,
+        SkSpan(xPos, count),
+        constY,
+        *font,
+        encoding).release();
 }
 
 extern "C" SkTextBlob *C_SkTextBlob_MakeFromPosText(const void *text, size_t byteLength,
                                                     const SkPoint pos[],
                                                     const SkFont *font,
                                                     SkTextEncoding encoding) {
-    return SkTextBlob::MakeFromPosText(text, byteLength, pos, *font, encoding).release();
+    const auto count = font->countText(text, byteLength, encoding);
+    return SkTextBlob::MakeFromPosText(
+        text,
+        byteLength,
+        SkSpan(pos, count),
+        *font,
+        encoding).release();
 }
 
 extern "C" SkTextBlob *C_SkTextBlob_MakeFromRSXform(const void *text, size_t byteLength,
                                                     const SkRSXform xform[],
                                                     const SkFont *font,
                                                     SkTextEncoding encoding) {
-    return SkTextBlob::MakeFromRSXform(text, byteLength, xform, *font, encoding).release();
+    const auto count = font->countText(text, byteLength, encoding);
+    return SkTextBlob::MakeFromRSXform(
+        text,
+        byteLength,
+        SkSpan(xform, count),
+        *font,
+        encoding).release();
 }
 
 extern "C" void C_SkTextBlob_Iter_destruct(SkTextBlob::Iter* self) {
@@ -1475,7 +1999,12 @@ extern "C" void C_SkFont_getIntercepts(
     SkScalar top, SkScalar bottom, 
     const SkPaint* paint, 
     VecSink<SkScalar>* vs) {
-    auto r = self->getIntercepts(glyphs, count, pos, top, bottom, paint);
+    auto r = self->getIntercepts(
+        SkSpan(glyphs, static_cast<size_t>(count)),
+        SkSpan(pos, static_cast<size_t>(count)),
+        top,
+        bottom,
+        paint);
     vs->set(r);
 }
 
@@ -2019,7 +2548,7 @@ extern "C" void C_SkImageGenerator_delete(SkImageGenerator *self) {
 }
 
 extern "C" SkData *C_SkImageGenerator_refEncodedData(SkImageGenerator *self) {
-    return self->refEncodedData().release();
+    return const_cast<SkData*>(self->refEncodedData().release());
 }
 
 extern "C" bool C_SkImageGenerator_isProtected(const SkImageGenerator* self) {
@@ -2548,7 +3077,7 @@ extern "C" SkPathEffect* C_SkCornerPathEffect_Make(SkScalar radius) {
 //
 
 extern "C" SkPathEffect* C_SkDashPathEffect_Make(const SkScalar intervals[], int count, SkScalar phase) {
-    return SkDashPathEffect::Make(intervals, count, phase).release();
+    return SkDashPathEffect::Make(SkSpan(intervals, static_cast<size_t>(count)), phase).release();
 }
 
 //
@@ -3147,6 +3676,36 @@ extern "C" void C_SkOpBuilder_destruct(SkOpBuilder* self) {
     self->~SkOpBuilder();
 }
 
+extern "C" bool C_SkPathOp_Op(
+        const SkPath* one, const SkPath* two, SkPathOp op, SkPath* result) {
+    return Op(*one, *two, op, result);
+}
+
+extern "C" bool C_SkPathOp_Simplify(const SkPath* path, SkPath* result) {
+    return Simplify(*path, result);
+}
+
+extern "C" bool C_SkPathOp_TightBounds(const SkPath* path, SkRect* result) {
+    auto rect = path->computeTightBounds();
+    if (rect.isFinite()) {
+        *result = rect;
+        return true;
+    }
+    return false;
+}
+
+extern "C" bool C_SkPathOp_AsWinding(const SkPath* path, SkPath* result) {
+    return AsWinding(*path, result);
+}
+
+extern "C" bool C_SkOpBuilder_resolve2(SkOpBuilder* self, SkPath* result) {
+    if (auto path = self->resolve()) {
+        *result = *path;
+        return true;
+    }
+    return false;
+}
+
 //
 // svg/
 //
@@ -3205,8 +3764,24 @@ extern "C" void C_SkOrderedFontMgr_append(SkOrderedFontMgr* self, SkFontMgr* fon
     self->append(sp(fontMgr));
 }
 
+extern "C" bool C_SkParsePath_FromSVGString(const char* str, SkPath* result) {
+    if (auto path = SkParsePath::FromSVGString(str)) {
+        *result = *path;
+        return true;
+    }
+    return false;
+}
+
 extern "C" void C_SkParsePath_ToSVGString(const SkPath* self, SkString* uninitialized, SkParsePath::PathEncoding encoding) {
     new (uninitialized) SkString(SkParsePath::ToSVGString(*self, encoding));
+}
+
+extern "C" bool C_SkFont_getPath(const SkFont* self, SkGlyphID glyph_id, SkPath* path) {
+    if (auto glyph_path = self->getPath(glyph_id)) {
+        *path = *glyph_path;
+        return true;
+    }
+    return false;
 }
 
 //

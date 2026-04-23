@@ -9,7 +9,7 @@ use std::ffi::CString;
 pub fn from_svg(svg: impl AsRef<str>) -> Option<Path> {
     let str = CString::new(svg.as_ref()).unwrap();
     let mut path = Path::default();
-    unsafe { sb::SkParsePath_FromSVGString(str.as_ptr(), path.native_mut()) }.if_true_some(path)
+    unsafe { sb::C_SkParsePath_FromSVGString(str.as_ptr(), path.native_mut()) }.if_true_some(path)
 }
 
 pub use skia_bindings::SkParsePath_PathEncoding as PathEncoding;

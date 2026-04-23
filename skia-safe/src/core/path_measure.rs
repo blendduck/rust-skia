@@ -1,4 +1,4 @@
-use crate::{prelude::*, scalar, ContourMeasure, Matrix, Path, Point, Vector};
+use crate::{prelude::*, scalar, ContourMeasure, Matrix, Path, PathBuilder, Point, Vector};
 use skia_bindings::{self as sb, SkPathMeasure};
 use std::fmt;
 
@@ -123,12 +123,12 @@ impl PathMeasure {
         stop_d: scalar,
         start_with_move_to: bool,
     ) -> Option<Path> {
-        let mut p = Path::default();
+        let mut builder = PathBuilder::new();
         unsafe {
             self.native_mut()
-                .getSegment(start_d, stop_d, p.native_mut(), start_with_move_to)
+                .getSegment(start_d, stop_d, builder.native_mut(), start_with_move_to)
         }
-        .if_true_some(p)
+        .if_true_then_some(|| builder.detach())
     }
 
     #[allow(clippy::wrong_self_convention)]

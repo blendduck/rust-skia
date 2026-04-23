@@ -20,6 +20,9 @@ pub struct Features {
     /// Build with Metal support?
     pub metal: bool,
 
+    /// Build with Graphite support?
+    pub graphite: bool,
+
     /// Build with Direct3D support?
     pub d3d: bool,
 
@@ -61,6 +64,7 @@ impl Default for Features {
             x11: cfg!(feature = "x11"),
             vulkan: cfg!(feature = "vulkan"),
             metal: cfg!(feature = "metal"),
+            graphite: cfg!(feature = "graphite"),
             d3d: cfg!(feature = "d3d"),
             text_layout: cfg!(feature = "textlayout"),
             svg: cfg!(feature = "svg"),
@@ -102,6 +106,9 @@ impl Features {
         if self.metal {
             feature_ids.push(feature_id::METAL);
         }
+        if self.graphite {
+            feature_ids.push(feature_id::GRAPHITE);
+        }
         if self.d3d {
             feature_ids.push(feature_id::D3D);
         }
@@ -133,6 +140,7 @@ mod feature_id {
     pub const GL: &str = "gl";
     pub const VULKAN: &str = "vulkan";
     pub const METAL: &str = "metal";
+    pub const GRAPHITE: &str = "graphite";
     pub const D3D: &str = "d3d";
     pub const TEXTLAYOUT: &str = "textlayout";
     pub const SVG: &str = "svg";

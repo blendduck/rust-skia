@@ -735,7 +735,7 @@ impl Surface {
         }
     }
 
-    pub fn peek_pixels(&mut self) -> Option<Pixmap> {
+    pub fn peek_pixels(&mut self) -> Option<Pixmap<'_>> {
         let mut pm = Pixmap::default();
         unsafe { self.native_mut().peekPixels(pm.native_mut()) }.if_true_some(pm)
     }

@@ -1,4 +1,4 @@
-use crate::{prelude::*, scalar, Matrix, Path, PathVerb, Point, Vector};
+use crate::{prelude::*, scalar, Matrix, Path, PathBuilder, PathVerb, Point, Vector};
 use skia_bindings::{
     self as sb, SkContourMeasure, SkContourMeasureIter, SkContourMeasure_ForwardVerbIterator,
     SkContourMeasure_VerbMeasure, SkRefCntBase,
@@ -80,19 +80,19 @@ impl ContourMeasure {
         stop_d: scalar,
         start_with_move_to: bool,
     ) -> Option<Path> {
-        let mut p = Path::default();
+        let mut builder = PathBuilder::new();
         unsafe {
             self.native()
-                .getSegment(start_d, stop_d, p.native_mut(), start_with_move_to)
+                .getSegment(start_d, stop_d, builder.native_mut(), start_with_move_to)
         }
-        .if_true_some(p)
+        .if_true_then_some(|| builder.detach())
     }
 
     pub fn is_closed(&self) -> bool {
         unsafe { sb::C_SkContourMeasure_isClosed(self.native()) }
     }
 
-    pub fn verbs(&self) -> ForwardVerbIterator {
+    pub fn verbs(&self) -> ForwardVerbIterator<'_> {
         let iterator =
             construct(|iterator| unsafe { sb::C_SkContourMeasure_begin(self.native(), iterator) });
 

@@ -1,6 +1,6 @@
 use crate::{prelude::*, scalar, Path, PathDirection, PathFillType, Point, RRect, Rect, Vector};
 use skia_bindings::{self as sb, SkPathBuilder};
-use std::{fmt, mem};
+use std::fmt;
 
 pub use skia_bindings::SkPathBuilder_ArcSize as ArcSize;
 variant_name!(ArcSize::Large);
@@ -134,10 +134,7 @@ impl PathBuilder {
     }
 
     pub fn polyline_to(&mut self, points: &[Point]) -> &mut Self {
-        unsafe {
-            self.native_mut()
-                .polylineTo(points.native().as_ptr(), points.len().try_into().unwrap());
-        }
+        unsafe { self.native_mut().polylineTo(sk_span(points.native())) };
         self
     }
 
@@ -311,24 +308,25 @@ impl PathBuilder {
         let center = center.into();
         let dir = dir.into().unwrap_or(PathDirection::CW);
         unsafe {
-            self.native_mut().addCircle(center.x, center.y, radius, dir);
-        }
+            self.native_mut()
+                .addCircle(center.into_native(), radius, dir)
+        };
         self
     }
 
     pub fn add_polygon(&mut self, pts: &[Point], is_closed: bool) -> &mut Self {
         unsafe {
-            self.native_mut().addPolygon(
-                pts.native().as_ptr(),
-                pts.len().try_into().unwrap(),
-                is_closed,
-            );
-        }
+            self.native_mut()
+                .addPolygon(sk_span(pts.native()), is_closed)
+        };
         self
     }
 
     pub fn add_path(&mut self, path: &Path) -> &mut Self {
-        unsafe { self.native_mut().addPath(path.native()) };
+        unsafe {
+            self.native_mut()
+                .addPath(path.native(), 0.0, 0.0, sb::SkPath_AddPathMode::Append)
+        };
         self
     }
 
@@ -337,6 +335,7 @@ impl PathBuilder {
             self.native_mut().incReserve(
                 extra_pt_count.try_into().unwrap(),
                 extra_verb_count.try_into().unwrap(),
+                0,
             )
         }
     }
@@ -351,7 +350,13 @@ impl PathBuilder {
 
     pub fn toggle_inverse_fill_type(&mut self) -> &mut Self {
         let n = self.native_mut();
-        n.fFillType = unsafe { mem::transmute::<i32, sb::SkPathFillType>(n.fFillType as i32 ^ 2) };
+        n.fFillType = match (n.fFillType as i32) ^ 2 {
+            0 => sb::SkPathFillType::Winding,
+            1 => sb::SkPathFillType::EvenOdd,
+            2 => sb::SkPathFillType::InverseWinding,
+            3 => sb::SkPathFillType::InverseEvenOdd,
+            _ => n.fFillType,
+        };
         self
     }
 

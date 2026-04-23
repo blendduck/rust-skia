@@ -12,6 +12,7 @@
 #include "modules/skparagraph/include/TextShadow.h"
 #include "modules/skparagraph/include/TextStyle.h"
 #include "modules/skparagraph/include/TypefaceFontProvider.h"
+#include "modules/skunicode/include/SkUnicode_icu.h"
 
 // m84: needs definition of SkFontData
 #include "src/core/SkFontDescriptor.h"
@@ -100,7 +101,8 @@ extern "C" {
     }
 
     SkTypeface* C_FontCollection_defaultFallback(FontCollection* self, SkUnichar unicode, SkFontStyle fontStyle, const SkString* locale) {
-        return self->defaultFallback(unicode, fontStyle, *locale).release();
+        std::vector<SkString> families;
+        return self->defaultFallback(unicode, families, fontStyle, *locale, std::nullopt).release();
     }
 
     SkTypeface* C_FontCollection_defaultFallback2(FontCollection* self) {
@@ -437,7 +439,8 @@ extern "C" {
     }
 
     ParagraphBuilder* C_ParagraphBuilder_make(const ParagraphStyle* style, const FontCollection* fontCollection) {
-        return ParagraphBuilder::make(*style, spFromConst(fontCollection)).release();
+        auto unicode = SkUnicodes::ICU::Make();
+        return ParagraphBuilder::make(*style, spFromConst(fontCollection), std::move(unicode)).release();
     }
 }
 

@@ -31,7 +31,7 @@ extern "C" bool C_SkSurface_replaceBackendTexture(
 //
 
 extern "C" bool C_SkImageGenerator_isValid(const SkImageGenerator* self, GrRecordingContext* context) {
-    return self->isValid(context);
+    return self->isValid(context ? context->asRecorder() : nullptr);
 }
 
 //

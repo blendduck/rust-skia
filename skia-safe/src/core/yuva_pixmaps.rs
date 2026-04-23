@@ -175,7 +175,7 @@ impl YUVAPixmapInfo {
     pub unsafe fn init_pixmaps_from_single_allocation(
         &self,
         memory: *mut c_void,
-    ) -> Option<[Pixmap; Self::MAX_PLANES]> {
+    ) -> Option<[Pixmap<'_>; Self::MAX_PLANES]> {
         // Can't return a Vec<Pixmap> because Pixmaps can't be cloned.
         let mut pixmaps: [Pixmap; Self::MAX_PLANES] = Default::default();
         self.native()
@@ -306,7 +306,7 @@ impl YUVAPixmaps {
     }
 
     /// Access the [Pixmap] planes.
-    pub fn planes(&self) -> &[Pixmap] {
+    pub fn planes(&self) -> &[Pixmap<'_>] {
         unsafe {
             let planes = Pixmap::from_native_ptr(sb::C_SkYUVAPixmaps_planes(self.native()));
             safer::from_raw_parts(planes, self.num_planes())
@@ -314,7 +314,7 @@ impl YUVAPixmaps {
     }
 
     /// Get the ith [Pixmap] plane. `Pixmap` will be default initialized if i >= numPlanes.
-    pub fn plane(&self, i: usize) -> &Pixmap {
+    pub fn plane(&self, i: usize) -> &Pixmap<'_> {
         &self.planes()[i]
     }
 

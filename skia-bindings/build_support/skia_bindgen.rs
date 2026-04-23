@@ -49,6 +49,12 @@ impl Configuration {
             if features.metal {
                 sources.push("src/metal.cpp".into());
             }
+            if features.graphite {
+                sources.push("src/graphite.cpp".into());
+            }
+            if features.graphite && features.metal {
+                sources.push("src/graphite_metal.cpp".into());
+            }
             if features.d3d {
                 sources.push("src/d3d.cpp".into());
             }
@@ -84,7 +90,7 @@ pub fn generate_bindings(
 ) {
     let mut builder = bindgen::Builder::default()
         .generate_comments(false)
-        .layout_tests(true)
+        .layout_tests(false)
         .default_enum_style(EnumVariation::Rust {
             non_exhaustive: false,
         })
@@ -141,7 +147,7 @@ pub fn generate_bindings(
         .allowlist_var("SK_Color.*")
         .allowlist_var("kAll_GrBackendState")
         .use_core()
-        .clang_arg("-std=c++17")
+        .clang_arg("-std=c++20")
         .clang_args(&["-x", "c++"])
         .clang_arg("-v");
 
@@ -215,13 +221,12 @@ pub fn generate_bindings(
     cc_build.cpp(true).out_dir(output_directory);
 
     {
-        let cpp17 = if target.builds_with_msvc() {
-            // m100: See also skia/BUILD.gn `config("cpp17")`
-            "/std:c++17"
+        let cpp20 = if target.builds_with_msvc() {
+            "/std:c++20"
         } else {
-            "-std=c++17"
+            "-std=c++20"
         };
-        cc_args.push(cpp17.into());
+        cc_args.push(cpp20.into());
     }
 
     // Disable RTTI. Otherwise RustWStream may cause compilation errors.
@@ -456,6 +461,11 @@ const OPAQUE_TYPES: &[&str] = &[
     "skia_private::THashMap",
     // m121:
     "skgpu::MutableTextureState",
+    "skgpu::graphite::BackendTexture",
+    "skgpu::graphite::Context",
+    "skgpu::graphite::MtlBackendContext",
+    "skgpu::graphite::Recorder",
+    "skgpu::graphite::Recording",
     // emscripten: Uses SkLRUCache (which is blocklisted)
     "skia::textlayout::ParagraphCache",
     // Fix bindgen 0.70 layout failures

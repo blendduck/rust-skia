@@ -120,6 +120,7 @@ impl FinalBuildConfiguration {
                 .arg("is_debug", yes_if(build.skia_debug))
                 .arg("skia_enable_svg", yes_if(features.svg))
                 .arg("skia_enable_gpu", yes_if(features.gpu()))
+                .arg("skia_enable_graphite", yes_if(features.graphite))
                 .arg("skia_enable_skottie", no());
 
             // Always enable PDF document support, because it gets switched off for WASM builds.

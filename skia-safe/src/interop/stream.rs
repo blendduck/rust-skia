@@ -102,7 +102,7 @@ impl fmt::Debug for MemoryStream<'_> {
 impl MemoryStream<'_> {
     // Create a stream asset that refers the bytes provided.
     #[allow(unused)]
-    pub fn from_bytes(bytes: &[u8]) -> MemoryStream {
+    pub fn from_bytes(bytes: &[u8]) -> MemoryStream<'_> {
         let ptr = unsafe { sb::C_SkMemoryStream_MakeDirect(bytes.as_ptr() as _, bytes.len()) };
 
         MemoryStream {

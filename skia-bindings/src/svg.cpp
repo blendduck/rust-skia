@@ -197,10 +197,11 @@ extern "C" void C_##type##_set##attr_name(type* self, const attr_type x) { \
 
 #define SVG_OPTIONAL_ATTRIBUTE(type, attr_name, attr_type)                 \
 extern "C" bool C_##type##_has##attr_name(const type& self) {              \
-    return self.get##attr_name().isValid();                                \
+    return self.get##attr_name().has_value();                              \
 }                                                                          \
 extern "C" const attr_type* C_##type##_get##attr_name(const type& self) {  \
-    return &*self.get##attr_name();                                        \
+    auto&& value = self.get##attr_name();                                  \
+    return value ? &*value : nullptr;                                      \
 }                                                                          \
 extern "C" void C_##type##_set##attr_name(type* self, const attr_type x) { \
     return self->set##attr_name(x);                                        \

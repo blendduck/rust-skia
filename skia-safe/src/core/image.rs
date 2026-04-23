@@ -908,7 +908,7 @@ impl Image {
     /// Returns: `true` if [`Image`] has direct access to pixels
     ///
     /// example: <https://fiddle.skia.org/c/@Image_peekPixels>
-    pub fn peek_pixels(&self) -> Option<Pixmap> {
+    pub fn peek_pixels(&self) -> Option<Pixmap<'_>> {
         let mut pixmap = Pixmap::default();
         unsafe { self.native().peekPixels(pixmap.native_mut()) }.if_true_some(pixmap)
     }

@@ -221,19 +221,14 @@ impl Font {
 
     pub fn text_to_glyphs(&self, text: impl EncodedText, glyphs: &mut [GlyphId]) -> usize {
         let (ptr, size, encoding) = text.as_raw();
+        let glyph_count = glyphs.len().min(i32::MAX.try_into().unwrap());
         unsafe {
             self.native()
                 .textToGlyphs(
                     ptr,
                     size,
                     encoding.into_native(),
-                    glyphs.as_mut_ptr(),
-                    // don't fail if glyphs.len() is too large to fit into an i32.
-                    glyphs
-                        .len()
-                        .min(i32::MAX.try_into().unwrap())
-                        .try_into()
-                        .unwrap(),
+                    sk_span_mut(&mut glyphs[..glyph_count]),
                 )
                 .try_into()
                 .unwrap()
@@ -246,9 +241,10 @@ impl Font {
 
     pub fn count_text(&self, text: impl EncodedText) -> usize {
         let (ptr, size, encoding) = text.as_raw();
+        let empty_glyphs: &mut [GlyphId] = &mut [];
         unsafe {
             self.native()
-                .textToGlyphs(ptr, size, encoding.into_native(), ptr::null_mut(), i32::MAX)
+                .textToGlyphs(ptr, size, encoding.into_native(), sk_span_mut(empty_glyphs))
                 .try_into()
                 .unwrap()
         }
@@ -295,11 +291,8 @@ impl Font {
     pub fn unichar_to_glyphs(&self, uni: &[Unichar], glyphs: &mut [GlyphId]) {
         assert_eq!(uni.len(), glyphs.len());
         unsafe {
-            self.native().unicharsToGlyphs(
-                uni.as_ptr(),
-                uni.len().try_into().unwrap(),
-                glyphs.as_mut_ptr(),
-            )
+            self.native()
+                .unicharsToGlyphs(sk_span(uni), sk_span_mut(glyphs))
         }
     }
 
@@ -325,16 +318,21 @@ impl Font {
             };
         }
 
-        let bounds_ptr = bounds.native_mut().as_ptr_or_null_mut();
-        let widths_ptr = widths.as_ptr_or_null_mut();
         let paint_ptr = paint.native_ptr_or_null();
+        let empty_widths: &mut [scalar] = &mut [];
+        let empty_bounds: &mut [Rect] = &mut [];
 
         unsafe {
             self.native().getWidthsBounds(
-                glyphs.as_ptr(),
-                count.try_into().unwrap(),
-                widths_ptr,
-                bounds_ptr,
+                sk_span(glyphs),
+                widths
+                    .as_deref_mut()
+                    .map(sk_span_mut)
+                    .unwrap_or_else(|| sk_span_mut(empty_widths)),
+                bounds
+                    .as_deref_mut()
+                    .map(|bounds| sk_span_mut(bounds.native_mut()))
+                    .unwrap_or_else(|| sk_span_mut(empty_bounds.native_mut())),
                 paint_ptr,
             )
         }
@@ -352,9 +350,8 @@ impl Font {
 
         unsafe {
             self.native().getPos(
-                glyphs.as_ptr(),
-                count.try_into().unwrap(),
-                pos.native_mut().as_mut_ptr(),
+                sk_span(glyphs),
+                sk_span_mut(pos.native_mut()),
                 *origin.native(),
             )
         }
@@ -366,12 +363,8 @@ impl Font {
         let origin = origin.unwrap_or_default();
 
         unsafe {
-            self.native().getXPos(
-                glyphs.as_ptr(),
-                count.try_into().unwrap(),
-                x_pos.as_mut_ptr(),
-                origin,
-            )
+            self.native()
+                .getXPos(sk_span(glyphs), sk_span_mut(x_pos), origin)
         }
     }
 
@@ -403,7 +396,8 @@ impl Font {
 
     pub fn get_path(&self, glyph_id: GlyphId) -> Option<Path> {
         let mut path = Path::default();
-        unsafe { self.native().getPath(glyph_id, path.native_mut()) }.if_true_some(path)
+        unsafe { sb::C_SkFont_getPath(self.native(), glyph_id, path.native_mut()) }
+            .if_true_some(path)
     }
 
     // TODO: getPaths() (needs a function to be passed, but supports a context).

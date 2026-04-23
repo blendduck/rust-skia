@@ -1,4 +1,4 @@
-use std::{fmt, io, ptr};
+use std::{fmt, io};
 
 use skia_bindings::{self as sb, SkRefCntBase, SkTypeface, SkTypeface_LocalizedStrings};
 
@@ -64,12 +64,13 @@ impl Typeface {
         &self,
     ) -> Option<Vec<font_arguments::variation_position::Coordinate>> {
         unsafe {
-            let r = self.native().getVariationDesignPosition(ptr::null_mut(), 0);
+            let empty: &mut [skia_bindings::SkFontArguments_VariationPosition_Coordinate] = &mut [];
+            let r = self.native().getVariationDesignPosition(sk_span_mut(empty));
             if r != -1 {
                 let mut v = vec![font_arguments::variation_position::Coordinate::default(); r as _];
                 let elements = self
                     .native()
-                    .getVariationDesignPosition(v.native_mut().as_mut_ptr(), r);
+                    .getVariationDesignPosition(sk_span_mut(v.native_mut()));
                 assert_eq!(elements, r);
                 Some(v)
             } else {
@@ -80,14 +81,15 @@ impl Typeface {
 
     pub fn variation_design_parameters(&self) -> Option<Vec<VariationAxis>> {
         unsafe {
+            let empty: &mut [skia_bindings::SkFontParameters_Variation_Axis] = &mut [];
             let r = self
                 .native()
-                .getVariationDesignParameters(ptr::null_mut(), 0);
+                .getVariationDesignParameters(sk_span_mut(empty));
             if r != -1 {
                 let mut v = vec![VariationAxis::default(); r as _];
                 let elements = self
                     .native()
-                    .getVariationDesignParameters(v.native_mut().as_mut_ptr(), r);
+                    .getVariationDesignParameters(sk_span_mut(v.native_mut()));
                 assert_eq!(elements, r);
                 Some(v)
             } else {
@@ -138,11 +140,8 @@ impl Typeface {
     pub fn unichars_to_glyphs(&self, uni: &[Unichar], glyphs: &mut [GlyphId]) {
         assert_eq!(uni.len(), glyphs.len());
         unsafe {
-            self.native().unicharsToGlyphs(
-                uni.as_ptr(),
-                uni.len().try_into().unwrap(),
-                glyphs.as_mut_ptr(),
-            )
+            self.native()
+                .unicharsToGlyphs(sk_span(uni), sk_span_mut(glyphs))
         }
     }
 
@@ -153,13 +152,8 @@ impl Typeface {
     pub fn text_to_glyphs(&self, text: impl EncodedText, glyphs: &mut [GlyphId]) -> usize {
         let (ptr, size, encoding) = text.as_raw();
         unsafe {
-            self.native().textToGlyphs(
-                ptr,
-                size,
-                encoding.into_native(),
-                glyphs.as_mut_ptr(),
-                glyphs.len().try_into().unwrap(),
-            )
+            self.native()
+                .textToGlyphs(ptr, size, encoding.into_native(), sk_span_mut(glyphs))
         }
         .try_into()
         .unwrap()
@@ -179,7 +173,7 @@ impl Typeface {
 
     pub fn table_tags(&self) -> Option<Vec<FontTableTag>> {
         let mut v: Vec<FontTableTag> = vec![0; self.count_tables()];
-        (unsafe { self.native().getTableTags(v.as_mut_ptr()) } != 0).if_true_some(v)
+        (unsafe { self.native().readTableTags(sk_span_mut(&mut v)) } != 0).if_true_some(v)
     }
 
     pub fn get_table_size(&self, tag: FontTableTag) -> Option<usize> {
@@ -219,11 +213,8 @@ impl Typeface {
     ) -> bool {
         (adjustments.len() + 1 == glyphs.len())
             && unsafe {
-                self.native().getKerningPairAdjustments(
-                    glyphs.as_ptr(),
-                    glyphs.len().try_into().unwrap(),
-                    adjustments.as_mut_ptr(),
-                )
+                self.native()
+                    .getKerningPairAdjustments(sk_span(glyphs), sk_span_mut(adjustments))
             }
     }
 

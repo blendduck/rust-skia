@@ -197,7 +197,7 @@ impl BiDiRunIterator {
 }
 
 impl Shaper {
-    pub fn new_bidi_run_iterator(utf8: &str, bidi_level: u8) -> Option<Borrows<BiDiRunIterator>> {
+    pub fn new_bidi_run_iterator(utf8: &str, bidi_level: u8) -> Option<Borrows<'_, BiDiRunIterator>> {
         let bytes = utf8.as_bytes();
         BiDiRunIterator::from_ptr(unsafe {
             sb::C_SkShaper_MakeBidiRunIterator(bytes.as_ptr() as _, bytes.len(), bidi_level)
@@ -205,7 +205,7 @@ impl Shaper {
         .map(|i| i.borrows(utf8))
     }
 
-    pub fn new_icu_bidi_run_iterator(utf8: &str, level: u8) -> Option<Borrows<BiDiRunIterator>> {
+    pub fn new_icu_bidi_run_iterator(utf8: &str, level: u8) -> Option<Borrows<'_, BiDiRunIterator>> {
         let bytes = utf8.as_bytes();
         BiDiRunIterator::from_ptr(unsafe {
             sb::C_SkShaper_MakeIcuBidiRunIterator(bytes.as_ptr() as _, bytes.len(), level)
@@ -249,7 +249,7 @@ impl ScriptRunIterator {
 }
 
 impl Shaper {
-    pub fn new_script_run_iterator(utf8: &str, script: FourByteTag) -> Borrows<ScriptRunIterator> {
+    pub fn new_script_run_iterator(utf8: &str, script: FourByteTag) -> Borrows<'_, ScriptRunIterator> {
         let bytes = utf8.as_bytes();
         ScriptRunIterator::from_ptr(unsafe {
             sb::C_SkShaper_MakeScriptRunIterator(
@@ -264,7 +264,7 @@ impl Shaper {
 
     // TODO: wrap MakeSkUnicodeHbScriptRunIterator (m88: uses type SkUnicode defined in src/).
 
-    pub fn new_hb_icu_script_run_iterator(utf8: &str) -> Borrows<ScriptRunIterator> {
+    pub fn new_hb_icu_script_run_iterator(utf8: &str) -> Borrows<'_, ScriptRunIterator> {
         let bytes = utf8.as_bytes();
         ScriptRunIterator::from_ptr(unsafe {
             sb::C_SkShaper_MakeHbIcuScriptRunIterator(bytes.as_ptr() as _, bytes.len())
@@ -345,7 +345,7 @@ pub mod run_handler {
         fn begin_line(&mut self);
         fn run_info(&mut self, info: &RunInfo);
         fn commit_run_info(&mut self);
-        fn run_buffer(&mut self, info: &RunInfo) -> Buffer;
+        fn run_buffer(&mut self, info: &RunInfo) -> Buffer<'_>;
         fn commit_run_buffer(&mut self, info: &RunInfo);
         fn commit_line(&mut self);
     }
@@ -377,6 +377,8 @@ pub mod run_handler {
             SkShaper_RunHandler_RunInfo {
                 fFont: self.font.native(),
                 fBidiLevel: self.bidi_level,
+                fScript: 0,
+                fLanguage: std::ptr::null(),
                 fAdvance: self.advance.into_native(),
                 glyphCount: self.glyph_count,
                 utf8Range: SkShaper_RunHandler_Range {
@@ -415,7 +417,7 @@ pub mod run_handler {
         pub(crate) unsafe fn from_native(
             buffer: &SkShaper_RunHandler_Buffer,
             glyph_count: usize,
-        ) -> Buffer {
+        ) -> Buffer<'_> {
             let offsets = buffer.offsets.into_option().map(|mut offsets| {
                 slice::from_raw_parts_mut(Point::from_native_ref_mut(offsets.as_mut()), glyph_count)
             });
@@ -662,7 +664,7 @@ impl NativeAccess for TextBlobBuilderRunHandler<'_> {
 impl NativeBase<SkShaper_RunHandler> for SkTextBlobBuilderRunHandler {}
 
 impl TextBlobBuilderRunHandler<'_> {
-    pub fn new(text: &str, offset: impl Into<Point>) -> TextBlobBuilderRunHandler {
+    pub fn new(text: &str, offset: impl Into<Point>) -> TextBlobBuilderRunHandler<'_> {
         let ptr = text.as_ptr();
         // we can safely pass a ptr to the utf8 text string to the RunHandler, because it does not
         // expect it to be 0 terminated, but this introduces another problem because

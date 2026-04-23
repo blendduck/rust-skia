@@ -75,7 +75,7 @@ impl Bitmap {
 
     /// Returns a constant reference to the [`Pixmap`] holding the [`Bitmap`] pixel address, row
     /// bytes, and [`ImageInfo`].
-    pub fn pixmap(&self) -> &Pixmap {
+    pub fn pixmap(&self) -> &Pixmap<'_> {
         Pixmap::from_native_ref(&self.native().fPixmap)
     }
 
@@ -731,7 +731,7 @@ impl Bitmap {
     /// and leave pixmap unchanged.
     ///
     /// example: <https://fiddle.skia.org/c/@Bitmap_peekPixels>
-    pub fn peek_pixels(&self) -> Option<Pixmap> {
+    pub fn peek_pixels(&self) -> Option<Pixmap<'_>> {
         let mut pixmap = Pixmap::default();
         unsafe { self.native().peekPixels(pixmap.native_mut()) }.if_true_some(pixmap)
     }

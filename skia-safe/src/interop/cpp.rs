@@ -13,7 +13,7 @@ pub struct VecSink<'a, T> {
 
 impl<T: 'static> VecSink<'_, T> {
     /// Create a new sink that calls back into the closure given.
-    pub fn new(v: &mut dyn FnMut(&[T])) -> VecSink<T> {
+    pub fn new(v: &mut dyn FnMut(&[T])) -> VecSink<'_, T> {
         VecSink {
             sink: sb::VecSink {
                 fn_trait: unsafe { mem::transmute::<&mut dyn FnMut(&[T]), TraitObject>(v) },
@@ -24,7 +24,7 @@ impl<T: 'static> VecSink<'_, T> {
         }
     }
 
-    pub fn new_mut(v: &mut dyn FnMut(&mut [T])) -> VecSink<T> {
+    pub fn new_mut(v: &mut dyn FnMut(&mut [T])) -> VecSink<'_, T> {
         VecSink {
             sink: sb::VecSink {
                 fn_trait: unsafe { mem::transmute::<&mut dyn FnMut(&mut [T]), TraitObject>(v) },
@@ -58,7 +58,7 @@ pub struct Sink<'a, T> {
 
 impl<T: 'static> Sink<'_, T> {
     /// Create a new sink that calls back into the closure given.
-    pub fn new(v: &mut dyn FnMut(&T)) -> Sink<T> {
+    pub fn new(v: &mut dyn FnMut(&T)) -> Sink<'_, T> {
         Sink {
             sink: sb::Sink {
                 fn_trait: unsafe { mem::transmute::<&mut dyn FnMut(&T), TraitObject>(v) },

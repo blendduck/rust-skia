@@ -543,7 +543,7 @@ impl Canvas {
     ///
     /// example: <https://fiddle.skia.org/c/@Canvas_accessTopLayerPixels_a>
     /// example: <https://fiddle.skia.org/c/@Canvas_accessTopLayerPixels_b>
-    pub fn access_top_layer_pixels(&self) -> Option<TopLayerPixels> {
+    pub fn access_top_layer_pixels(&self) -> Option<TopLayerPixels<'_>> {
         let mut info = ImageInfo::default();
         let mut row_bytes = 0;
         let mut origin = IPoint::default();
@@ -583,7 +583,7 @@ impl Canvas {
     /// Returns [`Pixmap`] if [`Canvas`] has direct access to pixels
     ///
     /// example: <https://fiddle.skia.org/c/@Canvas_peekPixels>
-    pub fn peek_pixels(&self) -> Option<Pixmap> {
+    pub fn peek_pixels(&self) -> Option<Pixmap<'_>> {
         let mut pixmap = Pixmap::default();
         unsafe { self.native_mut().peekPixels(pixmap.native_mut()) }.if_true_some(pixmap)
     }
@@ -1300,7 +1300,7 @@ impl Canvas {
     pub fn draw_points(&self, mode: PointMode, pts: &[Point], paint: &Paint) -> &Self {
         unsafe {
             self.native_mut()
-                .drawPoints(mode, pts.len(), pts.native().as_ptr(), paint.native())
+                .drawPoints(mode, sk_span(pts.native()), paint.native())
         }
         self
     }
@@ -1833,16 +1833,20 @@ impl Canvas {
         assert_eq!(positions.len(), count);
         assert_eq!(clusters.len(), count);
         let utf8_text = utf8_text.as_ref().as_bytes();
-        let origin = origin.into();
+        let origin = origin.into().into_native();
+        let utf8_text = unsafe {
+            slice::from_raw_parts(
+                utf8_text.as_ptr() as *const ::core::ffi::c_char,
+                utf8_text.len(),
+            )
+        };
         unsafe {
             self.native_mut().drawGlyphs(
-                count.try_into().unwrap(),
-                glyphs.as_ptr(),
-                positions.native().as_ptr(),
-                clusters.as_ptr(),
-                utf8_text.len().try_into().unwrap(),
-                utf8_text.as_ptr() as _,
-                origin.into_native(),
+                sk_span(glyphs),
+                sk_span(positions.native()),
+                sk_span(clusters),
+                sk_span(utf8_text),
+                origin,
                 font.native(),
                 paint.native(),
             )
@@ -1881,10 +1885,9 @@ impl Canvas {
             return;
         }
         let positions: GlyphPositions = positions.into();
-        let origin = origin.into();
+        let origin = origin.into().into_native();
 
-        let glyphs = glyphs.as_ptr();
-        let origin = origin.into_native();
+        let glyphs = glyphs;
         let font = font.native();
         let paint = paint.native();
 
@@ -1893,9 +1896,8 @@ impl Canvas {
                 assert_eq!(points.len(), count);
                 unsafe {
                     self.native_mut().drawGlyphs1(
-                        count.try_into().unwrap(),
-                        glyphs,
-                        points.native().as_ptr(),
+                        sk_span(glyphs),
+                        sk_span(points.native()),
                         origin,
                         font,
                         paint,
@@ -1905,10 +1907,9 @@ impl Canvas {
             GlyphPositions::RSXforms(xforms) => {
                 assert_eq!(xforms.len(), count);
                 unsafe {
-                    self.native_mut().drawGlyphs2(
-                        count.try_into().unwrap(),
-                        glyphs,
-                        xforms.native().as_ptr(),
+                    self.native_mut().drawGlyphsRSXform(
+                        sk_span(glyphs),
+                        sk_span(xforms.native()),
                         origin,
                         font,
                         paint,
@@ -2105,13 +2106,15 @@ impl Canvas {
         if let Some(color_slice) = colors {
             assert_eq!(color_slice.len(), count);
         }
+        let empty_colors: &[Color] = &[];
         unsafe {
             self.native_mut().drawAtlas(
                 atlas.native(),
-                xform.native().as_ptr(),
-                tex.native().as_ptr(),
-                colors.native().as_ptr_or_null(),
-                count.try_into().unwrap(),
+                sk_span(xform.native()),
+                sk_span(tex.native()),
+                colors
+                    .map(|colors| sk_span(colors.native()))
+                    .unwrap_or_else(|| sk_span(empty_colors.native())),
                 mode,
                 sampling.into().native(),
                 cull_rect.into().native().as_ptr_or_null(),
@@ -2338,7 +2341,7 @@ pub mod lattice {
     }
 
     impl Lattice<'_> {
-        pub(crate) fn native(&self) -> Ref {
+        pub(crate) fn native(&self) -> Ref<'_> {
             if let Some(rect_types) = self.rect_types {
                 let rect_count = (self.x_divs.len() + 1) * (self.y_divs.len() + 1);
                 assert_eq!(rect_count, rect_types.len());
@@ -2424,7 +2427,7 @@ impl AutoCanvasRestore {
     /// - `do_save` call [`Canvas::save()`]
     ///
     /// Returns utility to restore [`Canvas`] state on destructor
-    pub fn guard(canvas: &Canvas, do_save: bool) -> AutoRestoredCanvas {
+    pub fn guard(canvas: &Canvas, do_save: bool) -> AutoRestoredCanvas<'_> {
         let restore = construct(|acr| unsafe {
             sb::C_SkAutoCanvasRestore_Construct(acr, canvas.native_mut(), do_save)
         });

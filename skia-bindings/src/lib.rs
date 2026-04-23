@@ -18,6 +18,24 @@ type std___2_string = std_string;
 
 include!(concat!(env!("OUT_DIR"), "/skia/bindings.rs"));
 
+pub use SkGradient_Interpolation_ColorSpace as SkGradientShader_Interpolation_ColorSpace;
+pub use SkGradient_Interpolation_HueMethod as SkGradientShader_Interpolation_HueMethod;
+pub use SkGradient_Interpolation_InPremul as SkGradientShader_Interpolation_InPremul;
+pub use SkPathBuilder_ArcSize as SkPath_ArcSize;
+
+pub const SkSVGCanvas_kConvertTextToPaths_Flag: SkSVGCanvas_Flags =
+    SkSVGCanvas_Flags_kConvertTextToPaths_Flag;
+pub const SkSVGCanvas_kNoPrettyXML_Flag: SkSVGCanvas_Flags = SkSVGCanvas_Flags_kNoPrettyXML_Flag;
+pub const SkSVGCanvas_kRelativePathEncoding_Flag: SkSVGCanvas_Flags =
+    SkSVGCanvas_Flags_kRelativePathEncoding_Flag;
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum SkApplyPerspectiveClip {
+    No = 0,
+    Yes = 1,
+}
+
 mod defaults;
 #[allow(unused_imports)]
 pub use defaults::*;

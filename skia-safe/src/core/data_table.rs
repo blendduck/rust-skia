@@ -96,7 +96,7 @@ impl DataTable {
 
     // TODO: wrap MakeArrayProc()
 
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<'_> {
         Iter {
             table: self,
             count: self.count(),

@@ -3,7 +3,7 @@ pub mod bmp_decoder {
 
     use crate::{codec::codecs::Decoder, codec::Result, Codec};
 
-    pub fn decode_stream(stream: &mut impl io::Read) -> result::Result<Codec, Result> {
+    pub fn decode_stream(stream: &mut impl io::Read) -> result::Result<Codec<'_>, Result> {
         decoder().from_stream(stream)
     }
 
@@ -17,7 +17,7 @@ pub mod gif_decoder {
 
     use crate::{codec::codecs::Decoder, codec::Result, Codec};
 
-    pub fn decode_stream(stream: &mut impl io::Read) -> result::Result<Codec, Result> {
+    pub fn decode_stream(stream: &mut impl io::Read) -> result::Result<Codec<'_>, Result> {
         decoder().from_stream(stream)
     }
 
@@ -31,7 +31,7 @@ pub mod ico_decoder {
 
     use crate::{codec::codecs::Decoder, codec::Result, Codec};
 
-    pub fn decode_stream(stream: &mut impl io::Read) -> result::Result<Codec, Result> {
+    pub fn decode_stream(stream: &mut impl io::Read) -> result::Result<Codec<'_>, Result> {
         decoder().from_stream(stream)
     }
 
@@ -45,7 +45,7 @@ pub mod jpeg_decoder {
 
     use crate::{codec::codecs::Decoder, codec::Result, Codec};
 
-    pub fn decode_stream(stream: &mut impl io::Read) -> result::Result<Codec, Result> {
+    pub fn decode_stream(stream: &mut impl io::Read) -> result::Result<Codec<'_>, Result> {
         decoder().from_stream(stream)
     }
 
@@ -59,7 +59,7 @@ pub mod png_decoder {
 
     use crate::{codec::codecs::Decoder, codec::Result, Codec};
 
-    pub fn decode_stream(stream: &mut impl io::Read) -> result::Result<Codec, Result> {
+    pub fn decode_stream(stream: &mut impl io::Read) -> result::Result<Codec<'_>, Result> {
         decoder().from_stream(stream)
     }
 
@@ -73,7 +73,7 @@ pub mod wbmp_decoder {
 
     use crate::{codec::codecs::Decoder, codec::Result, Codec};
 
-    pub fn decode_stream(stream: &mut impl io::Read) -> result::Result<Codec, Result> {
+    pub fn decode_stream(stream: &mut impl io::Read) -> result::Result<Codec<'_>, Result> {
         decoder().from_stream(stream)
     }
 

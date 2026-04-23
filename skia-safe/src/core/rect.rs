@@ -482,9 +482,12 @@ impl Rect {
     }
 
     pub fn to_quad(self) -> [Point; 4] {
-        let mut quad = [Point::default(); 4];
-        unsafe { self.native().toQuad(quad.native_mut().as_mut_ptr()) }
-        quad
+        [
+            Point::new(self.left, self.top),
+            Point::new(self.right, self.top),
+            Point::new(self.right, self.bottom),
+            Point::new(self.left, self.bottom),
+        ]
     }
 
     pub fn set_empty(&mut self) {
@@ -502,23 +505,16 @@ impl Rect {
 
     pub fn set_bounds(&mut self, points: &[Point]) {
         unsafe {
-            self.native_mut()
-                .setBoundsCheck(points.native().as_ptr(), points.len().try_into().unwrap());
+            self.native_mut().setBoundsCheck(sk_span(points.native()));
         }
     }
 
     pub fn set_bounds_check(&mut self, points: &[Point]) -> bool {
-        unsafe {
-            self.native_mut()
-                .setBoundsCheck(points.native().as_ptr(), points.len().try_into().unwrap())
-        }
+        unsafe { self.native_mut().setBoundsCheck(sk_span(points.native())) }
     }
 
     pub fn set_bounds_no_check(&mut self, points: &[Point]) {
-        unsafe {
-            self.native_mut()
-                .setBoundsNoCheck(points.native().as_ptr(), points.len().try_into().unwrap())
-        }
+        unsafe { self.native_mut().setBoundsNoCheck(sk_span(points.native())) }
     }
 
     pub fn set_bounds2(&mut self, p0: impl Into<Point>, p1: impl Into<Point>) {
@@ -531,11 +527,7 @@ impl Rect {
 
     pub fn from_bounds(points: &[Point]) -> Option<Self> {
         let mut r = Self::default();
-        unsafe {
-            r.native_mut()
-                .setBoundsCheck(points.native().as_ptr(), points.len().try_into().unwrap())
-        }
-        .if_true_some(r)
+        unsafe { r.native_mut().setBoundsCheck(sk_span(points.native())) }.if_true_some(r)
     }
 
     pub fn set_xywh(&mut self, x: f32, y: f32, width: f32, height: f32) {
